@@ -38,6 +38,7 @@ if (Test-Path build) {
 }
 
 Write-Host "=== CONFIGURE ==="
+$env:PICO_SDK_FETCH_FROM_GIT_TAG = "2.1.1"
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DGP2040_BOARDCONFIG=RP2040AdvancedBreakoutBoard" -DPICO_SDK_FETCH_FROM_GIT=on
 if ($LASTEXITCODE -ne 0) {
     Write-Host "CONFIGURE FAILED"
