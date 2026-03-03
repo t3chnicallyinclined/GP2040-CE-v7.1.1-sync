@@ -1,102 +1,101 @@
-<p align="center">
-  <a href="https://gp2040-ce.info">
-    <img alt="GP2040-CE" src="https://raw.githubusercontent.com/OpenStickCommunity/Site/main/docs/assets/images/gp2040-ce-logo.png" />
-  </a>
-</p>
+# GP2040-CE NOBD
 
-<p align="center">
-  Multi-Platform Gamepad Firmware for RP2040
-</p>
+A fork of [GP2040-CE](https://gp2040-ce.info/) v0.7.12 that adds **NOBD (No OBD)** — a sync window that groups near-simultaneous button presses so they arrive on the same USB frame. Built for MvC2, where dropped dashes from split LP+HP presses are a constant problem.
 
-<p align="center">
-  <img src="https://img.shields.io/github/license/OpenStickCommunity/GP2040-CE" />
-  <img src="https://img.shields.io/github/actions/workflow/status/OpenStickCommunity/GP2040-CE/cmake.yml" />
-  <br />
-  <img src="https://img.shields.io/badge/inputlag.science-0.86%20ms-blue" />
-  <img src="https://img.shields.io/badge/MiSTer%20latency-0.765%20ms-blue" />
-</p>
+> **Zero added latency.** Stock GP2040-CE already debounces every input at 5ms. NOBD replaces that debounce with a 5ms sync window — same latency, but your simultaneous presses are guaranteed to arrive together.
 
-<p>
-  GP2040-CE (Community Edition) is a gamepad firmware for the Raspberry Pi Pico and other boards based on the RP2040 microcontrollers that combines multi-platform compatibility, low latency and a rich feature set to provide endless customization possibilities without sacrificing performance.
-</p>
+## Demo (MvC2)
 
-<p>
-  GP2040-CE is compatible with PC, PS3, PS4, PS5, Nintendo Switch, Xbox One, Steam Deck, MiSTer and Android.
-</p>
+**Sync disabled** — dropped dashes, stray jabs
 
-## Links
+https://github.com/user-attachments/assets/df4f4f12-4077-4e27-92e2-1057e5668e74
 
-[Downloads](https://gp2040-ce.info/downloads) | [Installation](https://gp2040-ce.info/installation) | [Wiring](https://gp2040-ce.info/controller-build/wiring) | [Usage](https://gp2040-ce.info/usage) | [FAQ](https://gp2040-ce.info/faq/faq-general) | [GitHub](https://github.com/OpenStickCommunity/GP2040-CE)
+**Sync enabled** — dashes come out clean every time
 
-Full documentation can be found at [https://gp2040-ce.info](https://gp2040-ce.info)
+https://github.com/user-attachments/assets/a56967f7-1b35-4f8f-9fda-de62dac0b089
 
-## Features
+## About
 
-- Select from 13 input modes including X-Input, Nintendo Switch, Playstation 4/5, Xbox One, D-Input, and Keyboard
-- Input latency average of 0.76ms in Xinput and 0.90ms for Playstation 5.
-- Multiple SOCD cleaning modes - Up Priority (a.k.a. Stickless), Neutral, and Second Input Priority.
-- Left and Right stick emulation via D-pad inputs as well as dedicated toggle switches.
-- Dual direction via D-pad + LS/RS.
-- Reversed input via a button.
-- [Turbo and Turbo LED](https://gp2040-ce.info/add-ons/turbo) with selectable speed
-- Per-button RGB LED support.
-- PWM Player indicator LED support (XInput only).
-- Multiple LED profiles support.
-- Support for 128x64 monochrome I2C displays - SSD1306, SH1106, and SH1107 compatible.
-- Custom startup splash screen and easy image upload via web configuration.
-- Support for passive buzzer speaker (3v or 5v).
-- [Built-in, embedded web configuration](https://gp2040-ce.info/web-configurator) - No download required!
+I'm a cloud engineer, not a firmware dev. I came back to MVC2 after a 15-year hiatus, started playing on Steam, and immediately noticed I was dropping dashes constantly. That sent me down a rabbit hole. **MVC2 is the only fighting game I play and the only game I've tested this with.** The sync window may help other fighting games that require simultaneous button presses, but many modern games (SF6, Guilty Gear, Skullgirls, etc.) have their own input leniency systems that may already handle this. I can't make claims about games I haven't tested.
 
-Visit the [GP2040-CE Usage](https://gp2040-ce.info/usage) page for more details.
+Everything here was pieced together from datasheets, API docs, community threads, trial and error, and a lot of back-and-forth with Claude AI. If you spot something wrong, feel free to correct me.
 
-## Performance
+## The Problem: Frame Boundaries
 
-Input latency is tested using the methodology outlined at [WydD's inputlag.science website](https://inputlag.science/controller/methodology), using the default 1000 Hz (1 ms) polling rate in the firmware. You can read more about the setup we use to conduct latency testing [HERE](https://github.com/OpenStickCommunity/Site/blob/main/latency_testing/README.md) if you are interested in testing for yourself or would just like to know more about the devices used to do the testing.
+When you press two buttons "at the same time," your fingers are actually 2-8ms apart. Games read input once per frame (~16.67ms at 60fps). If your two presses straddle a frame boundary, the game sees them on separate frames — LP on one frame, HP on the next. In MvC2, that means a stray jab instead of a dash.
 
-| Version | Mode    | Poll Rate | Min     | Max     | Avg     | Stdev   | % on time | %1f skip | %2f skip |
-| ------- | ------- | --------- | ------- | ------- | ------- | ------- | --------- | -------- | -------- |
-| v0.7.11 | Xinput  | 1 ms      | 0.45 ms | 1.28 ms | 0.76 ms | 0.24 ms | 98.48%    | 1.52%    | 0%       |
-| v0.7.11 | Switch  | 1 ms      | 0.41 ms | 1.23 ms | 0.72 ms | 0.24 ms | 98.53%    | 1.47%    | 0%       |
-| v0.7.11 | HID USB | 1 ms      | 0.41 ms | 1.30 ms | 0.72 ms | 0.24 ms | 98.53%    | 1.47%    | 0%       |
-| v0.7.11 | PS3     | 1 ms      | 0.52 ms | 1.46 ms | 0.83 ms | 0.24 ms | 98.38%    | 1.62%    | 0%       |
-| v0.7.11 | PS4     | 1 ms      | 0.55 ms | 2.37 ms | 0.90 ms | 0.32 ms | 98.19%    | 1.81%    | 0%       |
-| v0.7.11 | PS5     | 1 ms      | 0.55 ms | 2.37 ms | 0.91 ms | 0.33 ms | 98.17%    | 1.83%    | 0%       |
+```
+ Case 1: Both presses land within the same frame → DASH ✓
 
-Full results can be found in the [GP2040-CE v0.7.10 Firmware Latency Test Results](https://github.com/OpenStickCommunity/Site/raw/main/latency_testing/GP2040-CE_Firmware_Latency_Test_Results_v0.7.11.xlsx) .xlsx Sheet.
+   Frame N poll         Frame N+1 poll
+        ↓                     ↓
+   ─────┼─────────────────────┼─────────
+        :    LP    HP         :
+        :    ↑     ↑          :
+        :    T=2   T=5        :
+        Game reads LP=1, HP=1 → DASH
 
-Results from v0.7.10 can be found [HERE](https://github.com/OpenStickCommunity/Site/raw/main/latency_testing/GP2040-CE_Firmware_Latency_Test_Results_v0.7.10.xlsx). Previous results can be found in the `latency_testing` folder.
 
-## Support
+ Case 2: Presses straddle a frame boundary → DROPPED ✗
 
-If you would like to discuss features, issues or anything else related to GP2040-CE please [create an issue](https://github.com/OpenStickCommunity/GP2040-CE/issues/new) or join the [OpenStick GP2040-CE Discord](https://discord.gg/k2pxhke7q8) support channel.
+              Frame N poll         Frame N+1 poll
+                   ↓                     ↓
+   ────────────────┼─────────────────────┼──────
+              LP   :         HP          :
+              ↑    :         ↑           :
+              T=15 :         T=18        :
+        Game reads LP=1, HP=0       Game reads LP=1, HP=1
+        → STRAY JAB                 → HP arrives too late
+```
 
-## Contributing
+MvC2 has no built-in leniency for simultaneous presses — if the buttons arrive on different frames, you get the wrong move. The sync window fixes this by holding the first press until the window expires, so both buttons are always committed together.
 
-Want to help improve GP2040-CE? There are a bunch of ways to contribute!
+## How the Sync Window Works
 
-### Community Participation
+When a new button press is detected, the firmware buffers it (not yet visible in USB reports). A timer starts (5ms default). Any additional presses during the window are added to the buffer. When the window expires, all buffered presses are committed at once.
 
-Have an idea for a cool new feature, or just want to discuss some technical details with the developers? Join the [OpenStick GP2040-CE Discord](https://discord.gg/k2pxhke7q8) server to participate in our active and ever-growing community!
+- **All inputs** (buttons + directions) go through the sync window, so direction+button combos like QCB+KK arrive together
+- **Releases** are instant — no delay on letting go of buttons (charge moves work fine)
+- **Slider = 0** disables the sync window entirely for raw passthrough
+- Replaces stock debounce — the sync window also handles switch bounce by continuously validating buffered presses against GPIO state (`sync_new &= raw`)
 
-### Pull Requests
+## OBD Context
 
-Pull requests are welcome and encouraged for enhancements, bug fixes and documentation updates.
+OBD (One Button Dash) maps a dash macro to a single button. NOBD is an alternative: you still press two buttons, but the firmware ensures they arrive together. No macros, no shortcuts — just reliable delivery of what your fingers are already doing.
 
-Please respect the coding style of the file(s) you are working in, and enforce the use of the `.editorconfig` file when present.
+## Configuration
 
-## Acknowledgements
+In the GP2040-CE web UI (hold S2 on boot → `http://192.168.7.1` → Settings):
 
-- [FeralAI](https://github.com/FeralAI) for building [GP2040](https://github.com/FeralAI/GP2040) and laying the foundation for this community project
-- Ha Thach's excellent [TinyUSB library](https://github.com/hathach/tinyusb) examples
-- fluffymadness's [tinyusb-xinput](https://github.com/fluffymadness/tinyusb-xinput) sample
-- Kevin Boone's [blog post on using RP2040 flash memory as emulated EEPROM](https://kevinboone.me/picoflash.html)
-- [bitbank2](https://github.com/bitbank2) for the [OneBitDisplay](https://github.com/bitbank2/OneBitDisplay) and [BitBang_I2C](https://github.com/bitbank2/BitBang_I2C) libraries, which were ported for use with the Pico SDK
-- [arntsonl](https://github.com/arntsonl) for the amazing cleanup and feature additions that brought us to v0.5.0
-- [alirin222](https://github.com/alirin222) for the awesome turbo code ([@alirin222](https://twitter.com/alirin222) on Twitter)
-- [deeebug](https://github.com/deeebug) for improvements to the web-UI and fixing the PS3 home button issue
-- [TheTrain](https://github.com/TheTrainGoes/GP2040-Projects) and [Fortinbra](https://github.com/Fortinbra) for helping keep our community chugging along
-- [PassingLink](https://github.com/passinglink/passinglink) for the technical details and code for PS4 implementation
-- [Youssef Habchi](https://youssef-habchi.com/) for allowing us to purchase a license to use Road Rage font for the project
-- [tamanegitaro](https://github.com/tamanegitaro/) and [alirin222](https://github.com/alirin222) for the basis of the mini/classic controller work
-- [Ryzee119](https://github.com/Ryzee119) for the wonderful [ogx360_t4](https://github.com/Ryzee119/ogx360_t4/) and xid_driver library for Original Xbox support
-- [Santroller](https://github.com/Santroller/Santroller) and [GIMX](https://github.com/matlo/GIMX) for technical examples of Xbox One authentication using pass-through
+| Slider | Behavior |
+|--------|----------|
+| **0 ms** | Raw passthrough, no sync or debounce |
+| **3-5 ms** | Recommended range. 5ms = same latency as stock debounce |
+| **6-8 ms** | If you still get occasional drops |
+
+Works on all platforms GP2040-CE supports (PC, Dreamcast via adapter, PS3/PS4/Switch, MiSTer, etc.) since the sync window operates at the GPIO level before any protocol-specific output.
+
+## Install
+
+1. Download the `.uf2` from the [Releases page](https://github.com/t3chnicallyinclined/GP2040-CE-NOBD/releases)
+2. Unplug your board, hold BOOTSEL, plug in via USB
+3. Copy the `.uf2` to the `RPI-RP2` drive that appears
+4. Board reboots with new firmware
+
+Built for **RP2040 Advanced Breakout Board**. To build for a different board, change the board config in `build_fw.bat` and run `.\build_fw.bat`.
+
+## Finger Gap Tester
+
+The release includes **finger-gap-tester.exe** — plug in your stick, press two buttons at the same time, and it shows your natural finger gap in milliseconds with a recommended NOBD value.
+
+**Windows SmartScreen note:** The .exe is unsigned, so Windows may warn you. Click "More info" → "Run anyway", or right-click → Properties → "Unblock".
+
+## References
+
+- [Dreamcast Maple Bus](https://dreamcast.wiki/Maple_bus) — 60Hz VBlank-synced polling (no intermediate reports)
+- [XInputGetState](https://learn.microsoft.com/en-us/windows/win32/api/xinput/nf-xinput-xinputgetstate) — Snapshot-only API
+- [DirectInput Buffered Mode](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ee416236(v=vs.85)) — Sees every state change
+- [SF6 Input Polling Analysis](https://www.eventhubs.com/news/2023/jun/17/sf6-input-trouble-breakdown/) — SF6 reads inputs 3x per frame
+- [GP2040-CE FAQ](https://gp2040-ce.info/faq/faq-general/) — 1000Hz USB polling, sub-1ms latency
+- [Controller Input Lag](https://inputlag.science/controller/results) — Comprehensive latency data
+- [MVC2 Arcade vs Dreamcast](https://archive.supercombo.gg/t/mvc2-differences-between-arcade-version-dreamcast-version/142388) — Version comparison
