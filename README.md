@@ -273,6 +273,12 @@ Output: `build/GP2040-CE_0.7.12_RP2040AdvancedBreakoutBoard.uf2`
 
 A pre-built `.uf2` is available on the [Releases page](https://github.com/t3chnicallyinclined/GP2040-CE-NOBD/releases).
 
+## Finger Gap Tester
+
+The release also includes **finger-gap-tester.exe** — a standalone tool that measures the time gap between your simultaneous button presses. Plug in your stick, press two buttons at the same time, and it shows your actual finger gap in milliseconds with a recommended NOBD slider value.
+
+**Windows SmartScreen note:** Since the .exe is unsigned, Windows may show a "Windows protected your PC" warning. This is normal for open-source tools. Click **"More info"** → **"Run anyway"** to proceed. You can also right-click the file → Properties → check **"Unblock"** before running.
+
 ## Board
 
 Built for **RP2040 Advanced Breakout Board**. To build for a different board, change `RP2040AdvancedBreakoutBoard` in `build_fw.ps1` to your board's config directory name under `configs/`.
