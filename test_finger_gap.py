@@ -124,7 +124,7 @@ except KeyboardInterrupt:
                 print(f"    {buckets[i]:2d}-{buckets[i+1]:2d}ms: {counts[i]:3d} ({pct:4.1f}%) {bar}")
 
         print()
-        print(f"  Recommended NOBD slider: {max(8, int(mx) + 2)}ms")
+        print(f"  Recommended NOBD slider: {max(5, int(mx) + 2)}ms")
         print(f"  (covers your slowest gap of {mx:.1f}ms with a little headroom)")
 
     print()

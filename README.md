@@ -154,7 +154,7 @@ You can't rely on the game to fix this. It depends entirely on which game you're
 
 The idea is simple: instead of reporting each button the instant it's pressed, wait a tiny bit. If another button arrives within that window, report them together. If not, report the single press after the window expires.
 
-The sync window operates at the **controller firmware level**, before any USB report is sent. When a new button press is detected, the firmware **buffers it**. The press is not included in USB HID reports. A short timer starts (~8ms by default). Any additional presses during that window are added to the buffer. When the window expires, **all buffered presses are committed at once**:
+The sync window operates at the **controller firmware level**, before any USB report is sent. When a new button press is detected, the firmware **buffers it**. The press is not included in USB HID reports. A short timer starts (5ms by default). Any additional presses during that window are added to the buffer. When the window expires, **all buffered presses are committed at once**:
 
 ```
 Without sync window (standard 1000Hz):
@@ -168,25 +168,24 @@ Without sync window (standard 1000Hz):
         3ms window where LP-only state is visible to the game
 
 
-With sync window (8ms):
+With sync window (5ms):
 
   T=0:  LP=0, HP=0  (report sent)
   T=1:  LP=0, HP=0  (report sent, LP buffered, NOT reported)
   T=2:  LP=0, HP=0  (report sent, still buffered)
   T=3:  LP=0, HP=0  (report sent, still buffered)
   T=4:  LP=0, HP=0  (report sent, HP added to buffer)
-  ...
-  T=9:  LP=1, HP=1  (report sent, window expired, both committed)
+  T=5:  LP=1, HP=1  (report sent, window expired, both committed)
         ↑
         NO intermediate state - game NEVER sees LP without HP
 ```
 
 The game either sees **nothing** (during the buffer window) or **both buttons together** (after commit). There is no point in time where a partial press is visible in the USB reports, regardless of how the game reads input (XInput, DirectInput, SF6's triple polling, MiSTer, etc.).
 
-The trade-off is a small amount of added latency on the **initial** press (the first button waits for the window to expire). But keep in mind, stock GP2040-CE already has a 5ms debounce delay on every press. Since the sync window replaces that debounce, the net increase is really only ~3ms over what you were already getting. For most people that's not noticeable. But the upside is that near-simultaneous presses are **guaranteed** to appear together. No more coin flip. No more dropped dashes because your fingers were 3ms apart and a frame boundary happened to land in between.
+The trade-off is a small amount of added latency on the **initial** press (the first button waits for the window to expire). But keep in mind, stock GP2040-CE already has a 5ms debounce delay on every press. Since the sync window replaces that debounce, the **net increase is zero** at the default 5ms setting — you're getting the same latency as stock, but with guaranteed simultaneous delivery. Most people's natural finger gap is 2-5ms, so the default covers virtually all presses. The upside is that near-simultaneous presses are **guaranteed** to appear together. No more coin flip. No more dropped dashes because your fingers were 3ms apart and a frame boundary happened to land in between.
 
-Critically, this **only affects new attack button presses**:
-- **Directional inputs** (up/down/left/right): Bypass the sync window entirely. Zero delay. Motion inputs (QCF, HCF, charge, etc.) are completely unaffected.
+Critically, this **only affects new presses** (buttons and directions):
+- **All inputs** (buttons + directions) go through the sync window so that direction+button combos (like QCB+KK for fly cancel) arrive together. Stock GP2040-CE already debounced all inputs at 5ms, so this is equivalent latency.
 - **Releases** (letting go of a button): Instant, zero delay. Charge moves (Megaman buster, Sentinel drones, etc.) work perfectly
 - **Holds** (keeping a button down): Completely unaffected. Once committed, a button stays held indefinitely
 - **Config mode**: Bypassed entirely so the web UI always works
@@ -207,8 +206,8 @@ In the GP2040-CE web UI (hold S2 on boot, navigate to `http://192.168.7.1`):
 - Go to **Settings**
 - Set **NOBD** slider:
   - **0 ms** = raw passthrough, no sync (default 1000Hz behavior)
-  - **~8 ms** = recommended for fighting games
-  - **10-12 ms** = if you still get occasional dropped simultaneous presses
+  - **5 ms** = default, recommended for most players (covers 2-5ms natural finger gap, same latency as stock debounce)
+  - **6-8 ms** = if you still get occasional dropped simultaneous presses
   - Keep it as low as works for you. Higher values add latency to initial presses
 
 ## Why It Replaces the Debounce (and Why I Think That's Fine)
@@ -227,13 +226,11 @@ Quick background on what debounce does. When a mechanical switch closes, the met
 sync_new &= raw;
 ```
 
-Every cycle, the firmware checks that every buffered press is still physically held on the GPIO pin. If a button bounces open mid-buffer, that line drops it. When the contact settles back closed, it gets re-captured. By the time the 8ms window expires, the bounce has long settled and only the stable press survives to be committed. The bounce noise gets continuously cleaned out. Release-side bounce is handled the same way: phantom re-presses enter the buffer but get cleaned out by `sync_new &= raw` before the window expires.
+Every cycle, the firmware checks that every buffered press is still physically held on the GPIO pin. If a button bounces open mid-buffer, that line drops it. When the contact settles back closed, it gets re-captured. By the time the 5ms window expires, the bounce has long settled and only the stable press survives to be committed. The bounce noise gets continuously cleaned out. Release-side bounce is handled the same way: phantom re-presses enter the buffer but get cleaned out by `sync_new &= raw` before the window expires.
 
-So the sync window handles attack button bounce, but not because "8ms is longer than bounce" (that's what I originally thought, and it's an oversimplification). It handles it because the code continuously validates buffered presses against the actual physical state of the buttons, every single cycle.
+So the sync window handles bounce not because "5ms is longer than bounce" (that's an oversimplification). It handles it because the code continuously validates buffered presses against the actual physical state of the buttons, every single cycle.
 
-**For directional inputs**, there's no debounce at all since they bypass the sync window entirely. From what I can tell, this is fine for fighting games because games read directions as held state ("is down pressed right now?"), not as edge triggers ("was down just pressed this frame?"). A 2ms bounce flicker on a direction is basically invisible to a game polling at 16.67ms intervals. You're holding each direction for 10-20ms+ during a motion, so a brief bounce at the start doesn't matter. Stock GP2040-CE only had 5ms of debounce on directions anyway, which was barely doing anything.
-
-That said, if you're on a hitbox/leverless and you're worried about directional bounce on your microswitches, get yourself an optical lever or optical switches and the problem goes away entirely.
+**All inputs** (buttons and directions) go through the sync window. This ensures that direction+button combos (like QCB+KK for fly cancel) arrive together. Stock GP2040-CE already debounced all inputs at 5ms, so this is the same latency — just smarter about grouping simultaneous presses.
 
 A few caveats:
 - **Slider at 0** means raw passthrough with no sync AND no debounce. No filtering at all.
