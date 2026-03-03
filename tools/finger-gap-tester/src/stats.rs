@@ -83,13 +83,13 @@ impl GapStats {
         result
     }
 
-    /// Recommended NOBD slider value: max(8, floor(max_gap) + 2)
+    /// Recommended NOBD slider value: max(5, floor(max_gap) + 2)
     pub fn recommended_nobd(&self) -> u32 {
         if self.gaps.is_empty() {
             return 0;
         }
         let mx = self.max();
-        8u32.max(mx as u32 + 2)
+        5u32.max(mx as u32 + 2)
     }
 
     pub fn clear(&mut self) {
