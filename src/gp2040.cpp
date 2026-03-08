@@ -87,6 +87,12 @@ void GP2040::setup() {
 	// new set of GPIOs to use...
 	this->initializeStandardGpio();
 
+	// Cache attack button GPIO mask for sync window detection
+	attackButtonGpios = gamepad->mapButtonB1->pinMask | gamepad->mapButtonB2->pinMask
+	                  | gamepad->mapButtonB3->pinMask | gamepad->mapButtonB4->pinMask
+	                  | gamepad->mapButtonL1->pinMask | gamepad->mapButtonR1->pinMask
+	                  | gamepad->mapButtonL2->pinMask | gamepad->mapButtonR2->pinMask;
+
 	const GamepadOptions& gamepadOptions = Storage::getInstance().getGamepadOptions();
 
 	// check setup options and add modes to the list
@@ -250,55 +256,55 @@ void GP2040::deinitializeStandardGpio() {
 void GP2040::debounceGpioGetAll() {
 	Mask_t raw_gpio = ~gpio_get_all();
 	Gamepad* gamepad = Storage::getInstance().GetGamepad();
-	// return if state isn't different than the actual
-	if (gamepad->debouncedGpio == (raw_gpio & buttonGpios)) return;
 
 	uint32_t debounceDelay = Storage::getInstance().getGamepadOptions().debounceDelay;
-	// abort if no delay is configured
+	// Raw passthrough if no delay configured
 	if (debounceDelay == 0) {
 		gamepad->debouncedGpio = raw_gpio;
 		return;
 	}
 
-    // All inputs (directions + buttons) go through the sync window.
-    // This ensures direction + button combos (like QCB+KK) arrive together.
-    // Stock GP2040-CE debounced everything at 5ms anyway, so this is equivalent.
+	// Sync window — ALL presses go through the same window.
+	// Guarantees simultaneous buttons land on the same frame.
+	// Keep debounceDelay short (2-3ms).
+	static bool     sync_pending   = false;
+	static uint64_t sync_start_us  = 0;
+	static Mask_t   sync_new       = 0;
 
-    static bool     sync_pending = false;
-    static uint32_t sync_start   = 0;
-    static Mask_t   sync_new     = 0;
+	uint64_t now_us = to_us_since_boot(get_absolute_time());
+	uint64_t debounceDelay_us = (uint64_t)debounceDelay * 1000;
 
-    uint32_t now = to_ms_since_boot(get_absolute_time());
+	// Early return if nothing to process (skip if sync window is active)
+	if (!sync_pending && gamepad->debouncedGpio == (raw_gpio & buttonGpios)) return;
 
-    Mask_t prev          = gamepad->debouncedGpio;
-    Mask_t just_pressed  = raw_gpio & ~prev & ~sync_new;   // truly new 0->1
-    Mask_t just_released = prev & ~raw_gpio;                // committed bits going 1->0
+	Mask_t raw_buttons   = raw_gpio & buttonGpios;
+	Mask_t prev          = gamepad->debouncedGpio;
+	Mask_t just_pressed  = raw_buttons & ~prev & ~sync_new;
+	Mask_t just_released = prev & ~raw_buttons;
 
-    // 1) releases always apply immediately (critical for charge moves)
-    if (just_released) {
-        gamepad->debouncedGpio &= ~just_released;
-    }
+	// 1) Releases always instant
+	if (just_released) gamepad->debouncedGpio &= ~just_released;
 
-    // 2) drop any pending presses whose input was released before commit
-    sync_new &= raw_gpio;
+	// 2) Drop pending presses released before commit
+	sync_new &= raw_buttons;
 
-    // 3) accumulate new presses into the sync window
-    if (just_pressed) {
-        if (!sync_pending) {
-            sync_pending = true;
-            sync_start   = now;
-            sync_new     = just_pressed;
-        } else {
-            sync_new |= just_pressed;
-        }
-    }
+	// 3) All new presses enter the sync window
+	if (just_pressed) {
+		if (!sync_pending) {
+			sync_pending  = true;
+			sync_start_us = now_us;
+			sync_new      = just_pressed;
+		} else {
+			sync_new |= just_pressed;
+		}
+	}
 
-    // 4) commit all buffered presses when window expires
-    if (sync_pending && (now - sync_start) >= debounceDelay) {
-        gamepad->debouncedGpio |= sync_new;
-        sync_pending = false;
-        sync_new     = 0;
-    }
+	// 4) Window expired → commit everything
+	if (sync_pending && (now_us - sync_start_us) >= debounceDelay_us) {
+		gamepad->debouncedGpio |= sync_new;
+		sync_pending = false;
+		sync_new     = 0;
+	}
 }
 
 void GP2040::run() {
